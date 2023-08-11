@@ -1,5 +1,5 @@
 [package]
-name = "silly-kitty-api"
+name = "kitty-bot"
 version = "0.1.0"
 edition = "2021"
 
