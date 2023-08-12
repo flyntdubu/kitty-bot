@@ -1,5 +1,3 @@
-extern crate dotenv;
-
 use dotenv::dotenv;
 use reqwest::Url;
 use std::error::Error;
@@ -9,7 +7,22 @@ use teloxide::{prelude::*, types::InputFile, utils::command::BotCommands};
 async fn main() {
     dotenv().ok();
 
-    log::info!("Starting...");
+    // Set up tracing-subscriber to print to console:
+    // - Including span events
+    // - By default, logging every event at INFO level or above.
+    let env_filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+        .from_env_lossy();
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_span_events(
+            tracing_subscriber::fmt::format::FmtSpan::CLOSE
+                | tracing_subscriber::fmt::format::FmtSpan::NEW,
+        )
+        .with_target(false)
+        .init();
+
+    tracing::info!("Creating bot");
 
     let bot = Bot::from_env();
 
@@ -26,6 +39,11 @@ enum Command {
     Meow,
 }
 
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(chat_id = "m.chat.id", user_id = "m.from.id")
+)]
 async fn answer(bot: Bot, m: Message, cmd: Command) -> ResponseResult<()> {
     match cmd {
         Command::Meow => {
@@ -44,6 +62,7 @@ async fn answer(bot: Bot, m: Message, cmd: Command) -> ResponseResult<()> {
                         if let Some(url) = cat_data[0].get("url") {
                             let p = Url::parse(url.as_str().unwrap()).unwrap();
                             bot.send_photo(chat.id, InputFile::url(p)).await?;
+                            tracing::info!(url = %url, "Sent a kitty");
                         } else {
                             bot.send_message(
                                 chat.id,
